@@ -1,0 +1,99 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <stdint.h>
+#include <HTTPClient.h>
+
+// HTTPS" https://randomnerdtutorials.com/esp32-https-requests/
+
+const char *WIFI_SSID = "karlsruhe.freifunk.net";
+const char *WIFI_PASSWORD = "";
+const unsigned long WIFI_DELAY = 500;
+unsigned long WIFI_CON_ATTEMPTS = 20;
+
+const char *REQUEST_BASE = "https://ipof.me/";
+
+#define REQUEST_ERR 1 << 1
+
+// const unsigned long BAUD_RATE = 115200;
+const unsigned long BAUD_RATE = 9600;
+/*
+  Setup WiFi connection
+  It is assumed that the baud rate is already set
+*/
+int setup_wifi()
+{
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.printf("Connecting to WiFi '%s'\n", WIFI_SSID);
+  while (WiFi.status() != WL_CONNECTED && WIFI_CON_ATTEMPTS-- > 0)
+  {
+    delay(WIFI_DELAY);
+    Serial.print(".");
+  }
+
+  if (WIFI_CON_ATTEMPTS <= 0)
+  {
+    Serial.printf("\nFailed to connect to WiFi '%s'\n", WIFI_SSID);
+    return 0;
+  }
+
+  Serial.printf("\nConnected to WiFi '%s'\n", WIFI_SSID);
+  return 1;
+}
+
+void setup()
+{
+  Serial.println("[*] Starting setup");
+  Serial.begin(BAUD_RATE);
+  if (!setup_wifi())
+  {
+    Serial.printf("Failed to connect to WiFi with '%s'\n", WiFi.localIP());
+    exit(1);
+  }
+  else
+  {
+    Serial.printf("Connected to WiFi with '%s'\n", WiFi.localIP());
+  }
+}
+
+int make_request()
+{
+  HTTPClient http;
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.printf("WiFi not connected. Aborting.\n");
+    return REQUEST_ERR;
+  }
+
+  http.begin(REQUEST_BASE);
+  int http_codee = http.GET();
+
+  if (http_codee > 0)
+  {
+    Serial.printf("HTTP code: %d\n", http_codee);
+    if (http_codee == HTTP_CODE_OK)
+    {
+      String payload = http.getString();
+      Serial.printf("Payload: %s\n", payload.c_str());
+    }
+  }
+  else
+  {
+    Serial.printf("HTTP request failed\n");
+  }
+  return 0;
+}
+
+void loop()
+{
+  int res = make_request();
+  if (res & REQUEST_ERR)
+  {
+    Serial.printf("Failed to make request\n");
+    exit(1);
+  }
+  else
+  {
+    Serial.printf("Request successful\n");
+    exit(0);
+  }
+}
